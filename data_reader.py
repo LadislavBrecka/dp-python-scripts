@@ -75,7 +75,7 @@ class serialPlot:
             parsed_data = UsartData(*new_values)
             print(parsed_data)
         except Exception:
-            print("WRONG")
+            print(self.rawData)
             parsed_data = UsartData(self.data_sp[-1],
                                     self.data_speed[-1],
                                     self.data_abs_pos[-1])
@@ -96,7 +96,7 @@ class serialPlot:
         if (abs(parsed_data.abs_pos) > self.abs_pos_ylim[1]):
             self.abs_pos_ylim = (self.abs_pos_ylim[0] * 2, self.abs_pos_ylim[1] * 2)
             ax3.set_ylim(self.abs_pos_ylim[0], self.abs_pos_ylim[1])
-        elif (max(abs(min(self.data_abs_pos)), abs(max(self.data_abs_pos))) < self.abs_pos_ylim[1] / 2):
+        elif (max(abs(min(self.data_abs_pos)), abs(max(self.data_abs_pos))) < self.abs_pos_ylim[1] / 2 and self.abs_pos_ylim[1] > 10000):
             self.abs_pos_ylim = (self.abs_pos_ylim[0] / 2, self.abs_pos_ylim[1] / 2)
             ax3.set_ylim(self.abs_pos_ylim[0], self.abs_pos_ylim[1])
 
@@ -117,14 +117,14 @@ class serialPlot:
         self.thread.join()
         self.serialConnection.close()
         print('Disconnected...')
-        # df = pd.DataFrame(self.csvData)
-        # df.to_csv('/home/rikisenia/Desktop/data.csv')
+        df = pd.DataFrame([self.data_sp, self.data_speed])
+        df.to_csv('/home/ladislav/Desktop/data.csv')
 
 
 def main():
     portName = '/dev/ttyACM0'
     baudRate = 115200
-    maxPlotLength = 1000
+    maxPlotLength = 3000
     dataNumBytes = 12
     # initializes all required variables
     s = serialPlot(portName, baudRate, maxPlotLength, dataNumBytes)
@@ -132,7 +132,7 @@ def main():
     s.readSerialStart()
 
     # plotting starts below
-    pltInterval = 50    # Period at which the plot animation updates [ms]
+    pltInterval = 10    # Period at which the plot animation updates [ms]
     xmin = 0
     xmax = maxPlotLength
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1)
