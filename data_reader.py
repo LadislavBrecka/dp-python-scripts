@@ -38,7 +38,7 @@ class serialPlot:
         self.data_w_pos = collections.deque([0] * plotLength, maxlen=plotLength)
         self.data_y_pos = collections.deque([0] * plotLength, maxlen=plotLength)
         self.abs_pos_ylim = (-1000, 1000)
-        # self.csvData = []
+        self.csvData = []
 
         print('Trying to connect to: ' + str(serialPort) +
               ' at ' + str(serialBaud) + ' BAUD.')
@@ -128,8 +128,8 @@ class serialPlot:
         self.thread.join()
         self.serialConnection.close()
         print('Disconnected...')
-        # df = pd.DataFrame([self.data_sp, self.data_speed])
-        # df.to_csv('/home/ladislav/Desktop/data.csv')
+        df = pd.DataFrame([self.data_u_speed, self.data_y_speed, self.data_w_pos, self.data_y_pos])
+        df.to_csv('/home/ladislav/Desktop/data.csv')
 
 
 def main():
@@ -161,7 +161,7 @@ def main():
     # subplot 2 - HAL 1 Sensor
     (lines_y_speed, lineValueText_y_speed, lineLabel_y_speed) = configureSubplot(
         ax2, title='Speed by HAL Sensor', xlabel='Sample [k]', ylabel='Frequency [Hz]',
-        lineLabel='Speed - y_speed', xlim=(xmin, xmax), ylim=(-350, 350))
+        lineLabel='Speed - y_speed', xlim=(xmin, xmax), ylim=(-270, 270))
 
     # subplot 3 - Set Point value of position
     (lines_w_pos, lineValueText_w_pos, lineLabel_w_pos) = configureSubplot(
