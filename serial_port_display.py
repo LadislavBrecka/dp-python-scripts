@@ -171,7 +171,7 @@ def main():
     # subplot 4 - HAL 1 absolute position
     (lines_y_pos, lineValueText_y_pos, lineLabel_y_pos) = configureSubplot(
         ax4, title='Position by HAL Sensor', xlabel='Sample [k]', ylabel='Abs. pos [ticks]',
-        lineLabel='Position - y_pos', xlim=(xmin, xmax), ylim=(-10000, 10000))
+        lineLabel='Position - y_pos', xlim=(xmin, xmax), ylim=(-1000, 1000))
 
     # animation plotting function
     anim = animation.FuncAnimation(fig, 
