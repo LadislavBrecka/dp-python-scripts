@@ -8,9 +8,8 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import struct
 import pandas as pd
-import re
-import sys
 from itertools import repeat
+from matplotlib.widgets import Button, TextBox
 
 class UsartData:
     def __init__(self, u_speed, y_speed, w_pos, y_pos):
@@ -31,14 +30,9 @@ class serialPlot:
         self.plotTimer = 0
         self.previousTimer = 0
         self.dataNumBytes = dataNumBytes
-        self.rawData = bytes
+        self.parsed_data = None
 
-        self.data_u_speed = collections.deque([0] * plotLength, maxlen=plotLength)
-        self.data_y_speed = collections.deque([0] * plotLength, maxlen=plotLength)
-        self.data_w_pos = collections.deque([0] * plotLength, maxlen=plotLength)
-        self.data_y_pos = collections.deque([0] * plotLength, maxlen=plotLength)
-        self.abs_pos_ylim = (-1000, 1000)
-        self.csvData = []
+        self.reset_graphs()
 
         print('Trying to connect to: ' + str(serialPort) +
               ' at ' + str(serialBaud) + ' BAUD.')
@@ -72,35 +66,18 @@ class serialPlot:
 
         timeText.set_text('Plot Interval = ' + str(self.plotTimer) + 'ms')
 
-        # we get the latest data point and append it to our array
-        try:
-            new_values = struct.unpack('<iiii', self.rawData)  # unpack the values
-            parsed_data = UsartData(*new_values)
-            print(parsed_data)
-        except Exception:
-            print(self.rawData)
-            parsed_data = UsartData(self.data_u_speed[-1],
-                                    self.data_y_speed[-1],
-                                    self.data_w_pos[-1],
-                                    self.data_y_pos[-1])
-
-        self.data_u_speed.append(parsed_data.u_speed)
-        self.data_y_speed.append(parsed_data.y_speed)
-        self.data_w_pos.append(parsed_data.w_pos)
-        self.data_y_pos.append(parsed_data.y_pos)
-
         lines_u_speed.set_data(range(self.plotMaxLength), self.data_u_speed)
         lines_y_speed.set_data(range(self.plotMaxLength), self.data_y_speed)
         lines_w_pos.set_data(range(self.plotMaxLength), self.data_w_pos)
         lines_y_pos.set_data(range(self.plotMaxLength), self.data_y_pos)
 
-        lineValueText_u_speed.set_text('[' + lineLabel_u_speed + '] = ' + str(parsed_data.u_speed))
-        lineValueText_y_speed.set_text('[' + lineLabel_y_speed + '] = ' + str(parsed_data.y_speed))
-        lineValueText_w_pos.set_text('[' + lineLabel_w_pos + '] = ' + str(parsed_data.w_pos))
-        lineValueText_y_pos.set_text('[' + lineLabel_y_pos + '] = ' + str(parsed_data.y_pos))
+        lineValueText_u_speed.set_text('[' + lineLabel_u_speed + '] = ' + str(self.parsed_data.u_speed))
+        lineValueText_y_speed.set_text('[' + lineLabel_y_speed + '] = ' + str(self.parsed_data.y_speed))
+        lineValueText_w_pos.set_text('[' + lineLabel_w_pos + '] = ' + str(self.parsed_data.w_pos))
+        lineValueText_y_pos.set_text('[' + lineLabel_y_pos + '] = ' + str(self.parsed_data.y_pos))
 
         # dynamically adjust ax3 if abs pos. overflow y limit
-        if (abs(parsed_data.y_pos) > self.abs_pos_ylim[1] or abs(parsed_data.w_pos) > self.abs_pos_ylim[1]):
+        if (abs(self.parsed_data.y_pos) > self.abs_pos_ylim[1] or abs(self.parsed_data.w_pos) > self.abs_pos_ylim[1]):
             self.abs_pos_ylim = (self.abs_pos_ylim[0] * 2, self.abs_pos_ylim[1] * 2)
             ax3.set_ylim(self.abs_pos_ylim[0], self.abs_pos_ylim[1])
             ax4.set_ylim(self.abs_pos_ylim[0], self.abs_pos_ylim[1])
@@ -120,22 +97,62 @@ class serialPlot:
             start_byte = self.serialConnection.read(1)   # read start byte
             if start_byte == b'S':                       # check if it's S
                 data = self.serialConnection.read_until(b'Z')   # read until stop byte 'Z'
-                self.rawData = data[1:len(data)-1]                # trim the bytes to contain only message
+                raw_data = data[1:len(data)-1]                # trim the bytes to contain only message
+                self.decode_and_save(raw_data)
+                pass
+
             self.isReceiving = True
+
+    def decode_and_save(self, raw_data):
+        try:
+            new_values = struct.unpack('<iiii', raw_data)  # unpack the values
+            self.parsed_data = UsartData(*new_values)
+            # print(self.parsed_data)
+        except Exception:
+            # print(raw_data)
+            self.parsed_data = UsartData(self.data_u_speed[-1],
+                                    self.data_y_speed[-1],
+                                    self.data_w_pos[-1],
+                                    self.data_y_pos[-1])
+            
+        self.data_u_speed.append(self.parsed_data.u_speed)
+        self.data_y_speed.append(self.parsed_data.y_speed)
+        self.data_w_pos.append(self.parsed_data.w_pos)
+        self.data_y_pos.append(self.parsed_data.y_pos)
+
+    def reset_graphs(self):
+        self.data_u_speed = collections.deque([0] * self.plotMaxLength, maxlen=self.plotMaxLength)
+        self.data_y_speed = collections.deque([0] * self.plotMaxLength, maxlen=self.plotMaxLength)
+        self.data_w_pos = collections.deque([0] * self.plotMaxLength, maxlen=self.plotMaxLength)
+        self.data_y_pos = collections.deque([0] * self.plotMaxLength, maxlen=self.plotMaxLength)
+        self.abs_pos_ylim = (-1000, 1000)
+        self.csvData = []
+
+    def save_data_to_csv(self, filename):
+        df = pd.DataFrame([self.data_u_speed, self.data_y_speed, self.data_w_pos, self.data_y_pos])
+        df.to_csv('/home/ladislav/School/dp/matlab/chap4/experiments/data/{}.csv'.format(filename))
 
     def close(self):
         self.isRun = False
         self.thread.join()
         self.serialConnection.close()
         print('Disconnected...')
-        df = pd.DataFrame([self.data_u_speed, self.data_y_speed, self.data_w_pos, self.data_y_pos])
-        df.to_csv('/home/ladislav/Desktop/data.csv')
 
+
+def configureSubplot(ax, title, xlabel, ylabel, lineLabel, xlim, ylim):
+    # ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_xlim(xlim[0], xlim[1])
+    ax.set_ylim(ylim[0], ylim[1])
+    lines = ax.plot([], [], label=lineLabel)[0]
+    lineValueText = ax.text(0.01, 0.65, '', transform=ax.transAxes)
+    return (lines, lineValueText, lineLabel)
 
 def main():
     portName = '/dev/ttyACM0'
     baudRate = 115200
-    maxPlotLength = 1000
+    maxPlotLength = 6000
     dataNumBytes = 12
     # initializes all required variables
     s = serialPlot(portName, baudRate, maxPlotLength, dataNumBytes)
@@ -188,20 +205,20 @@ def main():
     ax3.legend(loc="upper left")
     ax4.legend(loc="upper left")
 
+    filename = plt.axes([0.83, 0.91, 0.07, 0.05])
+    filename_txtbx = TextBox(filename, "Filename", textalignment="center", label_pad=0.1, initial='data')
+
+    save_graphs = plt.axes([0.92, 0.91, 0.07, 0.05])
+    save_graphs_btn = Button(save_graphs, 'Save CSV')
+    save_graphs_btn.on_clicked(lambda x: s.save_data_to_csv(filename_txtbx.text))
+
+    reset_graphs = plt.axes([0.92, 0.83, 0.07, 0.05])
+    reset_graphs_btn = Button(reset_graphs, 'Reset')
+    reset_graphs_btn.on_clicked(lambda x: s.reset_graphs())
+
     # plt.tight_layout()
     plt.show()
     s.close()
-
-
-def configureSubplot(ax, title, xlabel, ylabel, lineLabel, xlim, ylim):
-    # ax.set_title(title)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_xlim(xlim[0], xlim[1])
-    ax.set_ylim(ylim[0], ylim[1])
-    lines = ax.plot([], [], label=lineLabel)[0]
-    lineValueText = ax.text(0.01, 0.65, '', transform=ax.transAxes)
-    return (lines, lineValueText, lineLabel)
 
 
 if __name__ == '__main__':
