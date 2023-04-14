@@ -130,7 +130,7 @@ class serialPlot:
 
     def save_data_to_csv(self, filename):
         df = pd.DataFrame([self.data_u_speed, self.data_y_speed, self.data_w_pos, self.data_y_pos])
-        df.to_csv('/home/ladislav/School/dp/matlab/chap4/experiments/data/{}.csv'.format(filename))
+        df.to_csv('/home/ladislav/School/dp/dp-matlab-scripts/chap4/data/{}.csv'.format(filename))
 
     def close(self):
         self.isRun = False
