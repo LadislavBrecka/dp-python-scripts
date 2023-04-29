@@ -9,6 +9,7 @@ import matplotlib.animation as animation
 import struct
 import pandas as pd
 from itertools import repeat
+import math
 from matplotlib.widgets import Button, TextBox
 
 class UsartData:
@@ -66,10 +67,11 @@ class serialPlot:
 
         timeText.set_text('Plot Interval = ' + str(self.plotTimer) + 'ms')
 
-        lines_u_speed.set_data(range(self.plotMaxLength), self.data_u_speed)
-        lines_y_speed.set_data(range(self.plotMaxLength), self.data_y_speed)
-        lines_w_pos.set_data(range(self.plotMaxLength), self.data_w_pos)
-        lines_y_pos.set_data(range(self.plotMaxLength), self.data_y_pos)
+        time_range = [x / 100.0 for x in range(self.plotMaxLength)]
+        lines_u_speed.set_data(time_range, self.data_u_speed)
+        lines_y_speed.set_data(time_range, self.data_y_speed)
+        lines_w_pos.set_data(time_range, self.data_w_pos)
+        lines_y_pos.set_data(time_range, self.data_y_pos)
 
         lineValueText_u_speed.set_text('[' + lineLabel_u_speed + '] = ' + str(self.parsed_data.u_speed))
         lineValueText_y_speed.set_text('[' + lineLabel_y_speed + '] = ' + str(self.parsed_data.y_speed))
@@ -107,9 +109,10 @@ class serialPlot:
         try:
             new_values = struct.unpack('<iiii', raw_data)  # unpack the values
             self.parsed_data = UsartData(*new_values)
-            # print(self.parsed_data)
-        except Exception:
-            # print(raw_data)
+            self.parsed_data.y_speed = round(2*math.pi * (self.parsed_data.y_speed / 12.0), 2)
+            print(self.parsed_data)
+        except Exception as e:
+            print(e)
             self.parsed_data = UsartData(self.data_u_speed[-1],
                                     self.data_y_speed[-1],
                                     self.data_w_pos[-1],
@@ -145,8 +148,9 @@ def configureSubplot(ax, title, xlabel, ylabel, lineLabel, xlim, ylim):
     ax.set_ylabel(ylabel)
     ax.set_xlim(xlim[0], xlim[1])
     ax.set_ylim(ylim[0], ylim[1])
+    ax.grid()
     lines = ax.plot([], [], label=lineLabel)[0]
-    lineValueText = ax.text(0.01, 0.65, '', transform=ax.transAxes)
+    lineValueText = ax.text(0.01, 0.6, '', transform=ax.transAxes)
     return (lines, lineValueText, lineLabel)
 
 def main():
@@ -162,7 +166,7 @@ def main():
     # plotting starts below
     pltInterval = 10    # Period at which the plot animation updates [ms]
     xmin = 0
-    xmax = maxPlotLength
+    xmax = int(maxPlotLength / 100.0)
     fig, ax = plt.subplots(2, 2)
     ax1 = ax[0, 0]
     ax2 = ax[0, 1]
@@ -172,23 +176,23 @@ def main():
 
     # subplot 1 - Input
     (lines_u_speed, lineValueText_u_speed, lineLabel_u_speed) = configureSubplot(
-        ax1, title='PWM % of input voltage', xlabel='Sample [k]', ylabel='Percentage [%]',
-        lineLabel='PWM - u_speed', xlim=(xmin, xmax), ylim=(-100, 100))
+        ax1, title='PWM Stride % of input voltage', xlabel='Time [s]', ylabel='Percentage [%]',
+        lineLabel='PWM Stride', xlim=(xmin, xmax), ylim=(-110, 110))
 
     # subplot 2 - HAL 1 Sensor
     (lines_y_speed, lineValueText_y_speed, lineLabel_y_speed) = configureSubplot(
-        ax2, title='Speed by HAL Sensor', xlabel='Sample [k]', ylabel='Frequency [Hz]',
-        lineLabel='Speed - y_speed', xlim=(xmin, xmax), ylim=(-270, 270))
+        ax2, title='Speed by HAL Sensor', xlabel='Time [s]', ylabel='Speed [$rad.s^{-1}$]',
+        lineLabel='Actual speed', xlim=(xmin, xmax), ylim=(-150, 150))
 
     # subplot 3 - Set Point value of position
     (lines_w_pos, lineValueText_w_pos, lineLabel_w_pos) = configureSubplot(
-        ax3, title='Position Set Point', xlabel='Sample [k]', ylabel='Abs. pos [ticks]',
-        lineLabel='Position - w_pos', xlim=(xmin, xmax), ylim=(-10000, 10000))
+        ax3, title='Position Set Point', xlabel='Time [s]', ylabel='Abs. pos. [imp]',
+        lineLabel='Target position', xlim=(xmin, xmax), ylim=(-1000, 1000))
     
     # subplot 4 - HAL 1 absolute position
     (lines_y_pos, lineValueText_y_pos, lineLabel_y_pos) = configureSubplot(
-        ax4, title='Position by HAL Sensor', xlabel='Sample [k]', ylabel='Abs. pos [ticks]',
-        lineLabel='Position - y_pos', xlim=(xmin, xmax), ylim=(-1000, 1000))
+        ax4, title='Position by HAL Sensor', xlabel='Time [s]', ylabel='Abs. pos. [imp]',
+        lineLabel='Actual position', xlim=(xmin, xmax), ylim=(-1000, 1000))
 
     # animation plotting function
     anim = animation.FuncAnimation(fig, 
